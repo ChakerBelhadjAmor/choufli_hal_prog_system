@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>شوفلي حل — عيادة سليمان</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100vh;
+      font-family: 'Cairo', sans-serif;
+      background: radial-gradient(ellipse at center,
+        #1a4a8a 0%, #0d2d6b 45%, #071a45 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Decorative globe behind card */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle,
+        rgba(255, 229, 102, 0.08) 0%,
+        rgba(245, 166, 35, 0.04) 40%,
+        transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 500px;
+      background: rgba(255, 255, 255, 0.05);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 229, 102, 0.25);
+      border-radius: 20px;
+      padding: 36px 32px;
+      box-shadow: 0 8px 48px rgba(0, 0, 0, 0.5),
+                  0 0 0 1px rgba(255, 229, 102, 0.1) inset;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    .header { text-align: center; margin-bottom: 28px; }
+
+    .title {
+      font-size: 3.4rem;
+      font-weight: 900;
+      line-height: 1.1;
+      background: linear-gradient(135deg, #ffe566 0%, #f5a623 50%, #c97d10 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: none;
+      filter: drop-shadow(0 2px 8px rgba(255, 180, 0, 0.45));
+    }
+
+    .subtitle {
+      margin-top: 6px;
+      font-size: 0.95rem;
+      color: rgba(255, 229, 102, 0.75);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Form ───────────────────────────────────────────────────────────── */
+    .form-group { margin-bottom: 16px; }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      color: rgba(255, 229, 102, 0.7);
+      margin-bottom: 6px;
+      font-weight: 600;
+    }
+
+    input[type="text"], textarea {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 229, 102, 0.3);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-family: 'Cairo', sans-serif;
+      font-size: 1rem;
+      color: #fff;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      direction: rtl;
+    }
+
+    input[type="text"]:focus, textarea:focus {
+      border-color: #ffe566;
+      box-shadow: 0 0 0 3px rgba(255, 229, 102, 0.15);
+    }
+
+    input::placeholder, textarea::placeholder { color: rgba(255,255,255,0.35); }
+
+    textarea { resize: vertical; min-height: 90px; }
+
+    .btn {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ffe566 0%, #f5a623 60%, #c97d10 100%);
+      color: #071a45;
+      font-family: 'Cairo', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 900;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      margin-top: 8px;
+    }
+    .btn:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+    .btn:active:not(:disabled) { transform: translateY(0); }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* ── Spinner ─────────────────────────────────────────────────────────── */
+    .spinner {
+      display: none;
+      text-align: center;
+      padding: 12px 0;
+      color: rgba(255, 229, 102, 0.8);
+      font-size: 0.9rem;
+    }
+    .spinner.active { display: block; }
+    .spinner::before {
+      content: '';
+      display: inline-block;
+      width: 20px; height: 20px;
+      border: 3px solid rgba(255, 229, 102, 0.3);
+      border-top-color: #ffe566;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      vertical-align: middle;
+      margin-left: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Zones ───────────────────────────────────────────────────────────── */
+    .zone { display: none; margin-top: 20px; }
+    .zone.active { display: block; animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    .bubble {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 229, 102, 0.2);
+      border-radius: 12px;
+      padding: 14px 18px;
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 0.95rem;
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+
+    /* Image placeholder boxes */
+    .img-placeholder {
+      width: 100%;
+      height: 220px;
+      border: 2px dashed rgba(255, 229, 102, 0.4);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255, 229, 102, 0.4);
+      font-size: 0.85rem;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .img-placeholder img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 10px;
+    }
+
+    /* Diagnostic card */
+    .diag-card {
+      background: linear-gradient(135deg,
+        rgba(34, 120, 70, 0.35) 0%,
+        rgba(20, 80, 45, 0.35) 100%);
+      border: 1px solid rgba(100, 220, 130, 0.35);
+      border-radius: 14px;
+      padding: 20px 22px;
+      color: #e8ffe0;
+    }
+    .diag-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 10px;
+      color: #b6ffcd;
+    }
+    .diag-text {
+      white-space: pre-line;
+      font-size: 1rem;
+      line-height: 1.8;
+      color: #d8fde8;
+    }
+
+    /* Reset button */
+    .btn-reset {
+      width: 100%;
+      padding: 11px;
+      border: 1px solid rgba(255, 229, 102, 0.4);
+      border-radius: 10px;
+      background: transparent;
+      color: rgba(255, 229, 102, 0.8);
+      font-family: 'Cairo', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 14px;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-reset:hover { background: rgba(255, 229, 102, 0.1); color: #ffe566; }
+
+    .error-msg {
+      background: rgba(200, 50, 50, 0.25);
+      border: 1px solid rgba(255, 100, 100, 0.4);
+      border-radius: 10px;
+      color: #ffb3b3;
+      padding: 12px 16px;
+      margin-top: 14px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    .error-msg.active { display: block; }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <!-- Header -->
+    <div class="header">
+      <div class="title">شوفلي حل</div>
+      <div class="subtitle">🏥 عيادة سليمان — نظام المواعيد الإلكتروني</div>
+    </div>
+
+    <!-- Form -->
+    <div id="form-section">
+      <div class="form-group">
+        <label for="nom">الاسم</label>
+        <input type="text" id="nom" placeholder="ادخل اسمك هنا..." />
+      </div>
+      <div class="form-group">
+        <label for="symptomes">الأعراض</label>
+        <textarea id="symptomes" placeholder="اشرح شنوه يوجعك..."></textarea>
+      </div>
+      <button class="btn" id="btn-consult" onclick="consulter()">
+        🏥 اطلب موعد عند الدكتور
+      </button>
+      <div class="spinner" id="spinner">بش نربطوك بالدكتور سليمان…</div>
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <!-- PHASE 1: Waiting room -->
+    <div class="zone" id="zone-attente">
+      <div class="bubble" id="bubble-attente"></div>
+      <div class="img-placeholder" id="img-dalanda">
+        <!-- replace with <img src="/static/dalanda.gif"> once file is present -->
+        <span>🪑 قاعة الانتظار</span>
+      </div>
+      <div class="bubble">📋 بش تستنى بهتة — صبري يا دالاندا 😅</div>
+    </div>
+
+    <!-- PHASE 2: Your turn -->
+    <div class="zone" id="zone-tour">
+      <div class="bubble" id="bubble-tour"></div>
+      <div class="img-placeholder" id="img-slimen">
+        <!-- replace with <img src="/static/slimen.gif"> once file is present -->
+        <span>🩺 الدكتور سليمان</span>
+      </div>
+      <div class="bubble">هيا أدخل بابا هيا 🤝 — الدكتور سليمان يستناك</div>
+    </div>
+
+    <!-- PHASE 3: Diagnostic -->
+    <div class="zone" id="zone-diagnostic">
+      <div class="diag-card">
+        <h3>🛋️ تشخيص الدكتور سليمان الأبيض — معالج نفسي</h3>
+        <div class="diag-text" id="diag-text"></div>
+      </div>
+      <button class="btn-reset" onclick="reset()">🔄 مريض جديد</button>
+    </div>
+
+  </div>
+
+  <script>
+    async function consulter() {
+      const nom       = document.getElementById('nom').value.trim();
+      const symptomes = document.getElementById('symptomes').value.trim();
+      const errEl     = document.getElementById('error-msg');
+
+      errEl.classList.remove('active');
+
+      if (!nom || !symptomes) {
+        errEl.textContent = 'من فضلك أدخل اسمك وأعراضك قبل المتابعة';
+        errEl.classList.add('active');
+        return;
+      }
+
+      // Disable form
+      document.getElementById('btn-consult').disabled = true;
+      document.getElementById('spinner').classList.add('active');
+
+      const form = new FormData();
+      form.append('nom', nom);
+      form.append('symptomes', symptomes);
+
+      try {
+        // No timeout on fetch — patient may wait several minutes in queue
+        const res  = await fetch('/consulter', { method: 'POST', body: form });
+        const data = await res.json();
+
+        document.getElementById('spinner').classList.remove('active');
+
+        if (!data.success) {
+          errEl.textContent = data.error || 'خطأ غير معروف';
+          errEl.classList.add('active');
+          document.getElementById('btn-consult').disabled = false;
+          return;
+        }
+
+        // Phase 1 — waiting room
+        document.getElementById('bubble-attente').textContent = data.msg_attente;
+
+        // Try to show GIF images if they exist
+        tryLoadImage('img-dalanda', '/static/dalanda.gif', '🪑 قاعة الانتظار');
+        tryLoadImage('img-slimen',  '/static/slimen.gif',  '🩺 الدكتور سليمان');
+
+        document.getElementById('zone-attente').classList.add('active');
+
+        // Phase 2 — your turn (after 2s)
+        setTimeout(() => {
+          document.getElementById('zone-attente').classList.remove('active');
+          document.getElementById('bubble-tour').textContent = data.msg_tour;
+          document.getElementById('zone-tour').classList.add('active');
+
+          // Phase 3 — diagnostic (after 1.5s more)
+          setTimeout(() => {
+            document.getElementById('zone-tour').classList.remove('active');
+            document.getElementById('diag-text').textContent = data.diagnostic;
+            document.getElementById('zone-diagnostic').classList.add('active');
+          }, 1500);
+        }, 2000);
+
+      } catch (err) {
+        document.getElementById('spinner').classList.remove('active');
+        errEl.textContent = 'خطأ في الاتصال: ' + err.message;
+        errEl.classList.add('active');
+        document.getElementById('btn-consult').disabled = false;
+      }
+    }
+
+    function tryLoadImage(placeholderId, src, fallbackText) {
+      const container = document.getElementById(placeholderId);
+      const img = new Image();
+      img.onload = () => {
+        container.innerHTML = '';
+        container.appendChild(img);
+      };
+      img.onerror = () => {
+        container.innerHTML = `<span>${fallbackText}</span>`;
+      };
+      img.src = src;
+    }
+
+    function reset() {
+      document.getElementById('nom').value       = '';
+      document.getElementById('symptomes').value = '';
+      document.getElementById('zone-attente').classList.remove('active');
+      document.getElementById('zone-tour').classList.remove('active');
+      document.getElementById('zone-diagnostic').classList.remove('active');
+      document.getElementById('error-msg').classList.remove('active');
+      document.getElementById('btn-consult').disabled = false;
+      document.getElementById('diag-text').textContent = '';
+    }
+  </script>
+</body>
+</html>
