@@ -20,8 +20,10 @@
 #include <arpa/inet.h>
 
 #define PORT        8080
-#define BUF_SIZE    1024
-#define NB_DIAG     8
+#define BUF_SIZE    2048
+#define NB_DIAG     12
+#define NB_DALANDA  6
+#define NB_TOUR     5
 
 /* ─── Linked-list FIFO queue ─────────────────────────────────────────────── */
 
@@ -47,17 +49,28 @@ static int               next_id    = 0;
 static int               total      = 0;
 static int               server_fd  = -1;
 
-/* ─── Sarcastic Tunisian diagnostics (Dr. Slimen Labyeth) ─────────────────── */
+/* ─── Dalanda: waiting-room messages ─────────────────────────────────────── */
+
+static const char *DALANDA_ATTENTE[NB_DALANDA] = {
+    "mar7ba bik monsieur tfadhal erte7 el docteur tw ychoufek chweye akhor\n"
+};
+
+/* ─── Slimen: your-turn messages ─────────────────────────────────────────── */
+
+static const char *SLIMEN_TOUR[NB_TOUR] = {
+    "tfadhal ,ahkili chnuwa t7es\n"
+};
+
+/* ─── Dr. Slimen: sarcastic psychiatric diagnostics ──────────────────────── */
 
 static const char *DIAGNOSTICS[NB_DIAG] = {
-    "واضح بيّن انّك تعبان من راسك مش من جسمك.\nالعلاج: بطّل تفكّر بزاف وروح نام.",
-    "انت تعاني من كسل مزمن مع هلوسة متقدمة.\nالعلاج: قوم من الكنبة وافتح الشباك.",
-    "تشخيصي: إدمان على التوتر بدون سبب منطقي.\nالعلاج: شوف حلقة من شوفلي حل وارتاح.",
-    "حالتك نادرة — الراس تقيل والجيب خاوي.\nالعلاج: نفسين عميقين وكاسة قهوة بدون سكر.",
-    "عندك ما نسميه 'سندروم التفكير الزيادة'.\nالعلاج: بطّل تحسب في كل شيء، الدنيا بخير.",
-    "مريض بالنوستالجيا والحنين لأيام ما صارتش.\nالعلاج: تقبّل الواقع وسيبها في ربي.",
-    "أعراضك كلاسيكية — إرهاق وجودي من الحياة اليومية.\nالعلاج: تبسّم في وجه الدنيا ولو غلط.",
-    "تعاني من 'فوبيا الصحة' — تجي تتشكّى وانت بخير.\nالعلاج: روح دير رياضة وبطّل تطلع في غوغل."
+
+    "3andek haja nsamiwhe 3ilmiyen b syndrome de sbou3i.\n",
+
+    "enti andek 7anin lil madhi w rabet el sa3ada taeek b hajet mchet\n"
+    "ama el sa3ada 7keye fergha marhouna f hkayet sghira hakaya kwayes tey ,chicha,dhohka maa el beji."
+
+
 };
 
 /* ─── Helpers ─────────────────────────────────────────────────────────────── */
@@ -77,7 +90,7 @@ static void log_msg(const char *icon, const char *msg) {
 
 static void print_queue(void) {
     /* caller must hold mutex_file */
-    printf("📋 File [%d] : ", file.taille);
+    printf("File [%d] : ", file.taille);
     Noeud *n = file.tete;
     while (n) {
         printf("#%d-%s", n->id, n->nom);
@@ -133,8 +146,7 @@ static time_t defiler(int id) {
 static void handle_sigint(int sig) {
     (void)sig;
     char ts[16]; timestamp(ts, sizeof(ts));
-    printf("\n[%s] ✘ Arrêt du serveur — %d consultation(s) effectuée(s).\n"
-           "       كيما Slah كي يقول: 'اليوم انتهى، نروحو!'\n", ts, total);
+    printf("\n[%s]Arrêt du serveur — %d consultation(s) effectuée(s).\n", ts, total);
     fflush(stdout);
     if (server_fd >= 0) close(server_fd);
     sem_destroy(&sem_consultation);
@@ -166,7 +178,7 @@ static void *handle_patient(void *arg) {
     if (send(client_fd, buf, strlen(buf), 0) < 0) goto nettoyage;
 
     snprintf(log_buf, sizeof(log_buf),
-             "⟶ Nouveau patient #%d connecté — مرحبا بيك في عيادة شوفلي حل!", id);
+             "Nouveau patient #%d connecté", id);
     log_msg("", log_buf);
 
     /* ── Step 2: Receive name ─────────────────────────────────────────────── */
@@ -184,15 +196,15 @@ static void *handle_patient(void *arg) {
     pthread_mutex_unlock(&mutex_file);
     log_msg("", log_buf);
 
-    /* ── Step 4: Send ATTENTE ─────────────────────────────────────────────── */
+    /* ── Step 4: Send ATTENTE (Dalanda) ──────────────────────────────────── */
     snprintf(buf, sizeof(buf),
-             "ATTENTE|Bonjour %s ! Vous êtes Patient #%d. Patientez… "
-             "📋 Dalenda قاعدة تستنى كيف العادة… نفس الصبر متاع الحلقة 12", nom, id);
+             "ATTENTE| dalanda zidou 9ahwa — %s (مريض رقم #%d) :\n%s",
+             nom, id, DALANDA_ATTENTE[id % NB_DALANDA]);
     if (send(client_fd, buf, strlen(buf), 0) < 0) goto nettoyage;
 
     /* ── Step 5: Wait for doctor (semaphore) ──────────────────────────────── */
     snprintf(log_buf, sizeof(log_buf),
-             "⏳ Patient #%d (%s) attend le médecin…", id, nom);
+             " Patient #%d (%s) attend le médecin…", id, nom);
     log_msg("", log_buf);
 
     sem_wait(&sem_consultation);
@@ -204,15 +216,15 @@ static void *handle_patient(void *arg) {
     total++;
     int wait_sec = (int)(time(NULL) - arr);
     snprintf(log_buf, sizeof(log_buf),
-             "▶ Consultation #%d : %s (Patient #%d) — attente: %ds", total, nom, id, wait_sec);
+             " Consultation #%d : %s (Patient #%d) — attente: %ds", total, nom, id, wait_sec);
     print_queue();
     pthread_mutex_unlock(&mutex_file);
     log_msg("", log_buf);
 
-    /* ── Step 7: Send VOTRE_TOUR ──────────────────────────────────────────── */
+    /* ── Step 7: Send VOTRE_TOUR (Slimen) ────────────────────────────────── */
     snprintf(buf, sizeof(buf),
-             "VOTRE_TOUR|C'est votre tour %s ! (attente: %ds) "
-             "Décrivez vos symptômes. 🩺 Slimen: هيا اقعد وقلي شنوه المشكلة 😅", nom, wait_sec);
+             "VOTRE_TOUR| الدكتور سليمان — %s (انتظرت %d ثانية) :\n%s",
+             nom, wait_sec, SLIMEN_TOUR[id % NB_TOUR]);
     if (send(client_fd, buf, strlen(buf), 0) < 0) goto nettoyage;
 
     /* ── Step 8: Receive symptoms ─────────────────────────────────────────── */
@@ -222,12 +234,12 @@ static void *handle_patient(void *arg) {
     symptoms[n] = '\0';
     symptoms[strcspn(symptoms, "\r\n")] = '\0';
 
-    snprintf(log_buf, sizeof(log_buf), "✉ Symptômes de %s (Patient #%d) reçus", nom, id);
+    snprintf(log_buf, sizeof(log_buf), " Symptômes de %s (Patient #%d) reçus", nom, id);
     log_msg("", log_buf);
 
     /* ── Step 9: Simulate consultation (8 seconds) ────────────────────────── */
     snprintf(log_buf, sizeof(log_buf),
-             "🩺 Examen en cours pour %s — Slimen يفكر بجدية متاع الحلقة الأخيرة…", nom);
+             "Examen en cours pour %s — Slimen ykhamam", nom);
     log_msg("", log_buf);
     sleep(8);
 
@@ -237,7 +249,7 @@ static void *handle_patient(void *arg) {
     if (send(client_fd, buf, strlen(buf), 0) < 0) goto nettoyage;
 
     snprintf(log_buf, sizeof(log_buf),
-             "✔ Diagnostic envoyé à %s — ✔ كيما في Choufli Hal، كل مشكلة عندها حل!", nom);
+             "Diagnostic envoyé à %s — kol mochkel andou 7al", nom);
     log_msg("", log_buf);
 
 nettoyage:
@@ -246,7 +258,7 @@ nettoyage:
     if (en_consultation) {
         pthread_mutex_lock(&mutex_file);
         snprintf(log_buf, sizeof(log_buf),
-                 "◀ Médecin disponible — %d consultation(s) au total", total);
+                 "Médecin disponible — %d consultation(s) au total", total);
         pthread_mutex_unlock(&mutex_file);
         log_msg("", log_buf);
         sem_post(&sem_consultation);
@@ -255,8 +267,7 @@ nettoyage:
         pthread_mutex_lock(&mutex_file);
         defiler(id);
         snprintf(log_buf, sizeof(log_buf),
-                 "✘ Patient #%d (%s) parti sans consulter — "
-                 "مشى بلا موعد كيما Slah كي يهرب من العيادة!", id, nom[0] ? nom : "?");
+                 "Patient #%d (%s) parti sans consulter — ", id, nom[0] ? nom : "?");
         print_queue();
         pthread_mutex_unlock(&mutex_file);
         log_msg("", log_buf);
@@ -294,8 +305,8 @@ int main(void) {
         perror("listen"); exit(1);
     }
 
-    log_msg("🏥", "Serveur شوفلي حل démarré sur le port 8080 — Dr. Slimen est prêt!");
-    log_msg("", "🩺 Slimen: يبدولي اليوم رانا نستقبلو بزاف مرضى… الله يعين 😅");
+    log_msg("", "Serveur thread شوفلي démarré sur le port 8080 — Dr. Slimen est prêt!");
+    log_msg("", "Slimen: Sbeh el nour Dalanda");
 
     /* Infinite accept loop */
     while (1) {

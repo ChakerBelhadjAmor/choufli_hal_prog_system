@@ -246,8 +246,7 @@
 
     <!-- Header -->
     <div class="header">
-      <div class="title">شوفلي حل</div>
-      <div class="subtitle">🏥 عيادة سليمان — نظام المواعيد الإلكتروني</div>
+      <img src="/static/choufli_thread_logo.png" alt="شوفلي حل" style="max-width:100%;max-height:160px;object-fit:contain;" />
     </div>
 
     <!-- Form -->
@@ -270,9 +269,8 @@
     <!-- PHASE 1: Waiting room -->
     <div class="zone" id="zone-attente">
       <div class="bubble" id="bubble-attente"></div>
-      <div class="img-placeholder" id="img-dalanda">
-        <!-- replace with <img src="/static/dalanda.gif"> once file is present -->
-        <span>🪑 قاعة الانتظار</span>
+      <div class="img-placeholder">
+        <img id="img-dalanda" src="" alt="دالاندا" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />
       </div>
       <div class="bubble">📋 بش تستنى بهتة — صبري يا دالاندا 😅</div>
     </div>
@@ -280,9 +278,8 @@
     <!-- PHASE 2: Your turn -->
     <div class="zone" id="zone-tour">
       <div class="bubble" id="bubble-tour"></div>
-      <div class="img-placeholder" id="img-slimen">
-        <!-- replace with <img src="/static/slimen.gif"> once file is present -->
-        <span>🩺 الدكتور سليمان</span>
+      <div class="img-placeholder">
+        <img id="img-slimen" src="" alt="الدكتور سليمان" style="width:100%;height:100%;object-fit:cover;border-radius:10px;" />
       </div>
       <div class="bubble">هيا أدخل بابا هيا 🤝 — الدكتور سليمان يستناك</div>
     </div>
@@ -334,24 +331,23 @@
           return;
         }
 
-        // Phase 1 — waiting room
+        // Phase 1 — waiting room (Dalanda GIF)
         document.getElementById('bubble-attente').textContent = data.msg_attente;
-
-        // Try to show GIF images if they exist
-        tryLoadImage('img-dalanda', '/static/dalanda.gif', '🪑 قاعة الانتظار');
-        tryLoadImage('img-slimen',  '/static/slimen.gif',  '🩺 الدكتور سليمان');
-
+        document.getElementById('img-dalanda').src = '/static/dalanda.gif';
         document.getElementById('zone-attente').classList.add('active');
 
-        // Phase 2 — your turn (after 2s)
+        // Phase 2 — your turn (Slimen GIF)
         setTimeout(() => {
           document.getElementById('zone-attente').classList.remove('active');
+          document.getElementById('img-dalanda').src = '';
           document.getElementById('bubble-tour').textContent = data.msg_tour;
+          document.getElementById('img-slimen').src = '/static/slimen.gif';
           document.getElementById('zone-tour').classList.add('active');
 
-          // Phase 3 — diagnostic (after 1.5s more)
+          // Phase 3 — diagnostic
           setTimeout(() => {
             document.getElementById('zone-tour').classList.remove('active');
+            document.getElementById('img-slimen').src = '';
             document.getElementById('diag-text').textContent = data.diagnostic;
             document.getElementById('zone-diagnostic').classList.add('active');
           }, 1500);
@@ -365,22 +361,11 @@
       }
     }
 
-    function tryLoadImage(placeholderId, src, fallbackText) {
-      const container = document.getElementById(placeholderId);
-      const img = new Image();
-      img.onload = () => {
-        container.innerHTML = '';
-        container.appendChild(img);
-      };
-      img.onerror = () => {
-        container.innerHTML = `<span>${fallbackText}</span>`;
-      };
-      img.src = src;
-    }
-
     function reset() {
       document.getElementById('nom').value       = '';
       document.getElementById('symptomes').value = '';
+      document.getElementById('img-dalanda').src = '';
+      document.getElementById('img-slimen').src  = '';
       document.getElementById('zone-attente').classList.remove('active');
       document.getElementById('zone-tour').classList.remove('active');
       document.getElementById('zone-diagnostic').classList.remove('active');
