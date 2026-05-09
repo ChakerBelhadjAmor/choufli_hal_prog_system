@@ -1,9 +1,3 @@
-/*
- * server.c — Choufli Hal Clinic TCP Server
- * عيادة شوفلي حل — Dr. Slimen Labyeth
- * Concepts: sockets, pthreads, semaphore, mutex, FIFO queue
- */
-
 #define _POSIX_C_SOURCE 200809L
 
 #include <stdio.h>
@@ -25,8 +19,6 @@
 #define NB_DALANDA  6
 #define NB_TOUR     5
 
-/* ─── Linked-list FIFO queue ─────────────────────────────────────────────── */
-
 typedef struct Noeud {
     int         id;
     char        nom[64];
@@ -40,8 +32,6 @@ typedef struct {
     int    taille;
 } FileAttente;
 
-/* ─── Globals ─────────────────────────────────────────────────────────────── */
-
 static sem_t             sem_consultation;
 static pthread_mutex_t   mutex_file = PTHREAD_MUTEX_INITIALIZER;
 static FileAttente       file       = {NULL, NULL, 0};
@@ -49,19 +39,13 @@ static int               next_id    = 0;
 static int               total      = 0;
 static int               server_fd  = -1;
 
-/* ─── Dalanda: waiting-room messages ─────────────────────────────────────── */
-
 static const char *DALANDA_ATTENTE[NB_DALANDA] = {
     "mar7ba bik monsieur tfadhal erte7 el docteur tw ychoufek chweye akhor\n"
 };
 
-/* ─── Slimen: your-turn messages ─────────────────────────────────────────── */
-
 static const char *SLIMEN_TOUR[NB_TOUR] = {
     "tfadhal ,ahkili chnuwa t7es\n"
 };
-
-/* ─── Dr. Slimen: sarcastic psychiatric diagnostics ──────────────────────── */
 
 static const char *DIAGNOSTICS[NB_DIAG] = {
 
@@ -72,8 +56,6 @@ static const char *DIAGNOSTICS[NB_DIAG] = {
 
 
 };
-
-/* ─── Helpers ─────────────────────────────────────────────────────────────── */
 
 static void timestamp(char *buf, size_t len) {
     time_t     now = time(NULL);
@@ -102,8 +84,6 @@ static void print_queue(void) {
     fflush(stdout);
 }
 
-/* ─── Queue operations (always called under mutex) ───────────────────────── */
-
 static void enfiler(int id, const char *nom) {
     Noeud *n = malloc(sizeof(Noeud));
     if (!n) { perror("malloc"); return; }
@@ -122,7 +102,6 @@ static void enfiler(int id, const char *nom) {
     file.taille++;
 }
 
-/* Returns arrival time of the removed node, or 0 if not found. */
 static time_t defiler(int id) {
     Noeud *prev = NULL, *cur = file.tete;
     while (cur && cur->id != id) {
@@ -141,8 +120,6 @@ static time_t defiler(int id) {
     return arr;
 }
 
-/* ─── Signal handler ─────────────────────────────────────────────────────── */
-
 static void handle_sigint(int sig) {
     (void)sig;
     char ts[16]; timestamp(ts, sizeof(ts));
@@ -153,8 +130,6 @@ static void handle_sigint(int sig) {
     pthread_mutex_destroy(&mutex_file);
     exit(0);
 }
-
-/* ─── Patient thread ──────────────────────────────────────────────────────── */
 
 typedef struct {
     int patient_id;
@@ -170,9 +145,8 @@ static void *handle_patient(void *arg) {
     char  buf[BUF_SIZE];
     char  nom[64]       = {0};
     char  log_buf[256];
-    int   en_consultation = 0; /* tracks whether sem_wait() was reached */
+    int   en_consultation = 0; 
 
-    /* ── Step 1: Send BONJOUR ─────────────────────────────────────────────── */
     snprintf(buf, sizeof(buf),
              "BONJOUR|Bienvenue ! Vous êtes Patient #%d. Quel est votre prénom ?", id);
     if (send(client_fd, buf, strlen(buf), 0) < 0) goto nettoyage;
@@ -181,14 +155,12 @@ static void *handle_patient(void *arg) {
              "Nouveau patient #%d connecté", id);
     log_msg("", log_buf);
 
-    /* ── Step 2: Receive name ─────────────────────────────────────────────── */
     int n = recv(client_fd, nom, sizeof(nom) - 1, 0);
     if (n <= 0) goto nettoyage;
     nom[n] = '\0';
     /* strip trailing newline */
     nom[strcspn(nom, "\r\n")] = '\0';
 
-    /* ── Step 3: Enqueue ──────────────────────────────────────────────────── */
     pthread_mutex_lock(&mutex_file);
     enfiler(id, nom);
     snprintf(log_buf, sizeof(log_buf), "✚ %s (Patient #%d) rejoint la file", nom, id);
@@ -196,13 +168,11 @@ static void *handle_patient(void *arg) {
     pthread_mutex_unlock(&mutex_file);
     log_msg("", log_buf);
 
-    /* ── Step 4: Send ATTENTE (Dalanda) ──────────────────────────────────── */
     snprintf(buf, sizeof(buf),
              "ATTENTE| dalanda zidou 9ahwa — %s (مريض رقم #%d) :\n%s",
              nom, id, DALANDA_ATTENTE[id % NB_DALANDA]);
     if (send(client_fd, buf, strlen(buf), 0) < 0) goto nettoyage;
 
-    /* ── Step 5: Wait for doctor (semaphore) ──────────────────────────────── */
     snprintf(log_buf, sizeof(log_buf),
              " Patient #%d (%s) attend le médecin…", id, nom);
     log_msg("", log_buf);
@@ -210,7 +180,6 @@ static void *handle_patient(void *arg) {
     sem_wait(&sem_consultation);
     en_consultation = 1;
 
-    /* ── Step 6: Dequeue + compute wait time ──────────────────────────────── */
     pthread_mutex_lock(&mutex_file);
     time_t arr  = defiler(id);
     total++;
@@ -221,13 +190,11 @@ static void *handle_patient(void *arg) {
     pthread_mutex_unlock(&mutex_file);
     log_msg("", log_buf);
 
-    /* ── Step 7: Send VOTRE_TOUR (Slimen) ────────────────────────────────── */
     snprintf(buf, sizeof(buf),
              "VOTRE_TOUR| الدكتور سليمان — %s (انتظرت %d ثانية) :\n%s",
              nom, wait_sec, SLIMEN_TOUR[id % NB_TOUR]);
     if (send(client_fd, buf, strlen(buf), 0) < 0) goto nettoyage;
 
-    /* ── Step 8: Receive symptoms ─────────────────────────────────────────── */
     char symptoms[BUF_SIZE] = {0};
     n = recv(client_fd, symptoms, sizeof(symptoms) - 1, 0);
     if (n <= 0) goto nettoyage;
@@ -237,13 +204,11 @@ static void *handle_patient(void *arg) {
     snprintf(log_buf, sizeof(log_buf), " Symptômes de %s (Patient #%d) reçus", nom, id);
     log_msg("", log_buf);
 
-    /* ── Step 9: Simulate consultation (8 seconds) ────────────────────────── */
     snprintf(log_buf, sizeof(log_buf),
              "Examen en cours pour %s — Slimen ykhamam", nom);
     log_msg("", log_buf);
     sleep(8);
 
-    /* ── Step 10: Send DIAGNOSTIC ─────────────────────────────────────────── */
     const char *diag = DIAGNOSTICS[id % NB_DIAG];
     snprintf(buf, sizeof(buf), "DIAGNOSTIC|Dr. Slimen → %s (Patient #%d) :\n%s", nom, id, diag);
     if (send(client_fd, buf, strlen(buf), 0) < 0) goto nettoyage;
@@ -263,7 +228,6 @@ nettoyage:
         log_msg("", log_buf);
         sem_post(&sem_consultation);
     } else {
-        /* patient disconnected before being seen */
         pthread_mutex_lock(&mutex_file);
         defiler(id);
         snprintf(log_buf, sizeof(log_buf),
@@ -276,39 +240,28 @@ nettoyage:
     return NULL;
 }
 
-/* ─── Main ────────────────────────────────────────────────────────────────── */
-
 int main(void) {
     signal(SIGINT, handle_sigint);
-
     if (sem_init(&sem_consultation, 0, 1) != 0) {
         perror("sem_init"); exit(1);
     }
-
-    /* Create TCP socket */
     server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) { perror("socket"); exit(1); }
-
     int opt = 1;
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
     struct sockaddr_in addr = {
         .sin_family      = AF_INET,
         .sin_port        = htons(PORT),
         .sin_addr.s_addr = INADDR_ANY
     };
-
     if (bind(server_fd, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         perror("bind"); exit(1);
     }
     if (listen(server_fd, 10) < 0) {
         perror("listen"); exit(1);
     }
-
     log_msg("", "Serveur thread شوفلي démarré sur le port 8080 — Dr. Slimen est prêt!");
     log_msg("", "Slimen: Sbeh el nour Dalanda");
-
-    /* Infinite accept loop */
     while (1) {
         struct sockaddr_in client_addr;
         socklen_t          client_len = sizeof(client_addr);
@@ -316,20 +269,16 @@ int main(void) {
                                                (struct sockaddr *)&client_addr,
                                                &client_len);
         if (client_fd < 0) {
-            if (errno == EINTR) break; /* SIGINT received */
+            if (errno == EINTR) break; 
             perror("accept");
             continue;
         }
-
-        /* Allocate args — freed inside handle_patient */
         PatientArgs *pa = malloc(sizeof(PatientArgs));
         if (!pa) { close(client_fd); continue; }
-
         pthread_mutex_lock(&mutex_file);
         pa->patient_id = next_id++;
         pthread_mutex_unlock(&mutex_file);
         pa->client_fd = client_fd;
-
         pthread_t tid;
         pthread_attr_t attr;
         pthread_attr_init(&attr);

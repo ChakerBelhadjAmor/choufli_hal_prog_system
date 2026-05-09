@@ -1,7 +1,4 @@
-/*
- * client.c — Choufli Hal Clinic Terminal Client
- * Usage: ./client <SERVER_IP>
- */
+
 
 #define _POSIX_C_SOURCE 200809L
 
@@ -16,7 +13,6 @@
 #define PORT     8080
 #define BUF_SIZE 2048
 
-/* Strip the "TYPE|" prefix and return a pointer to the content part. */
 static const char *extraire(const char *buf) {
     const char *p = strchr(buf, '|');
     return p ? p + 1 : buf;
@@ -27,8 +23,6 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "Usage: %s <SERVER_IP>\n", argv[0]);
         exit(1);
     }
-
-    /* ── Create TCP socket ──────────────────────────────────────────────── */
     int sock = socket(AF_INET, SOCK_STREAM, 0);
     if (sock < 0) { perror("socket"); exit(1); }
 
@@ -49,20 +43,17 @@ int main(int argc, char *argv[]) {
     char buf[BUF_SIZE];
     int  n;
 
-    /* ── Step 2: Receive BONJOUR ────────────────────────────────────────── */
     n = recv(sock, buf, sizeof(buf) - 1, 0);
     if (n <= 0) { close(sock); exit(1); }
     buf[n] = '\0';
     printf("\n%s\n", extraire(buf));
 
-    /* ── Step 3: Send name ──────────────────────────────────────────────── */
     char nom[64];
     printf("Votre prénom: ");
     fflush(stdout);
     if (!fgets(nom, sizeof(nom), stdin)) { close(sock); exit(1); }
     send(sock, nom, strlen(nom), 0);
 
-    /* ── Step 4: Receive ATTENTE ────────────────────────────────────────── */
     n = recv(sock, buf, sizeof(buf) - 1, 0);
     if (n <= 0) { close(sock); exit(1); }
     buf[n] = '\0';
@@ -70,20 +61,17 @@ int main(int argc, char *argv[]) {
     printf("(En attente du médecin…)\n");
     fflush(stdout);
 
-    /* ── Step 5: Receive VOTRE_TOUR (blocks until doctor is free) ───────── */
     n = recv(sock, buf, sizeof(buf) - 1, 0);
     if (n <= 0) { close(sock); exit(1); }
     buf[n] = '\0';
     printf("\n%s\n", extraire(buf));
 
-    /* ── Step 6: Send symptoms ──────────────────────────────────────────── */
     char symptoms[BUF_SIZE];
     printf("Décrivez vos symptômes: ");
     fflush(stdout);
     if (!fgets(symptoms, sizeof(symptoms), stdin)) { close(sock); exit(1); }
     send(sock, symptoms, strlen(symptoms), 0);
 
-    /* ── Step 7: Receive DIAGNOSTIC ────────────────────────────────────── */
     n = recv(sock, buf, sizeof(buf) - 1, 0);
     if (n <= 0) { close(sock); exit(1); }
     buf[n] = '\0';
